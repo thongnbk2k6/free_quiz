@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Quiz Bot</title>
+  <style>
+    :root {
+      --primary: #6C5CE7;
+      --primary-dark: #5A4BD1;
+      --bg: #f0f2f5;
+      --card: #ffffff;
+      --text: #2d3436;
+      --muted: #636e72;
+      --border: #dfe6e9;
+      --success: #00b894;
+      --danger: #d63031;
+      --terminal-bg: #1e1e2e;
+      --terminal-text: #cdd6f4;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+    /* ── NAV ── */
+    .navbar { background: var(--primary); color: #fff; padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 8px rgba(0,0,0,.15); }
+    .navbar h1 { font-size: 1.3rem; font-weight: 700; }
+    .status { display: flex; align-items: center; gap: 8px; font-size: .85rem; }
+    .status-dot { width: 10px; height: 10px; border-radius: 50%; background: #b2bec3; transition: background .3s; }
+    .status-dot.running { background: var(--success); box-shadow: 0 0 6px var(--success); }
+
+    /* ── TABS ── */
+    .tabs { display: flex; background: var(--card); border-bottom: 2px solid var(--border); padding: 0 24px; }
+    .tab-btn { background: none; border: none; padding: 14px 20px; font-size: .95rem; font-weight: 600; color: var(--muted); cursor: pointer; border-bottom: 3px solid transparent; transition: all .2s; }
+    .tab-btn:hover { color: var(--primary); }
+    .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
+
+    /* ── CONTENT ── */
+    .container { max-width: 960px; margin: 24px auto; padding: 0 16px; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .card { background: var(--card); border-radius: 12px; padding: 24px; margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+    .card h2 { font-size: 1.05rem; margin-bottom: 16px; color: var(--primary); }
+
+    /* ── FORM ── */
+    label { display: block; font-size: .85rem; font-weight: 600; margin-bottom: 4px; color: var(--muted); }
+    input[type="text"], textarea {
+      width: 100%; padding: 10px 14px; border: 2px solid var(--border); border-radius: 8px;
+      font-size: .95rem; transition: border-color .2s; outline: none; font-family: inherit;
+    }
+    input[type="text"]:focus, textarea:focus { border-color: var(--primary); }
+    .form-row { display: flex; gap: 16px; margin-bottom: 14px; }
+    .form-row > div { flex: 1; }
+
+    /* ── RADIO ── */
+    .radio-group { display: flex; gap: 20px; margin-bottom: 16px; }
+    .radio-group label { display: flex; align-items: center; gap: 6px; cursor: pointer; font-weight: 500; color: var(--text); }
+
+    /* ── BUTTONS ── */
+    .btn { padding: 10px 22px; border: none; border-radius: 8px; font-size: .9rem; font-weight: 600; cursor: pointer; transition: all .2s; }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover:not(:disabled) { background: var(--primary-dark); }
+    .btn-danger { background: var(--danger); color: #fff; }
+    .btn-danger:hover:not(:disabled) { background: #c0392b; }
+    .btn-success { background: var(--success); color: #fff; }
+    .btn-success:hover:not(:disabled) { background: #00a381; }
+    .btn-sm { padding: 6px 14px; font-size: .8rem; }
+    .btn-group { display: flex; gap: 10px; }
+
+    /* ── LOG TERMINAL ── */
+    .terminal { background: var(--terminal-bg); color: var(--terminal-text); border-radius: 10px; padding: 16px; height: 360px; overflow-y: auto; font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace; font-size: .82rem; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
+    .terminal .log-line { padding: 1px 0; }
+    .terminal .log-line::before { content: '› '; color: var(--primary); font-weight: bold; }
+
+    /* ── TABLE ── */
+    .qa-table { width: 100%; border-collapse: collapse; font-size: .88rem; }
+    .qa-table th { text-align: left; padding: 10px 12px; background: var(--bg); color: var(--muted); font-weight: 600; font-size: .8rem; text-transform: uppercase; letter-spacing: .5px; }
+    .qa-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    .qa-table tr:hover td { background: #f8f9ff; }
+    .qa-table .col-num { width: 40px; color: var(--muted); text-align: center; }
+    .qa-table .col-action { width: 60px; text-align: center; }
+    .del-btn { background: none; border: none; color: var(--danger); cursor: pointer; font-size: 1.1rem; padding: 2px 6px; border-radius: 4px; }
+    .del-btn:hover { background: #ffeaea; }
+
+    /* ── TEXTAREA ── */
+    textarea { min-height: 140px; resize: vertical; }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 640px) {
+      .form-row { flex-direction: column; gap: 10px; }
+      .tabs { padding: 0 12px; }
+      .tab-btn { padding: 12px 14px; font-size: .85rem; }
+      .container { padding: 0 10px; }
+    }
+
+    /* ── TOAST ── */
+    .toast { position: fixed; bottom: 24px; right: 24px; padding: 12px 20px; border-radius: 8px; color: #fff; font-size: .88rem; font-weight: 600; opacity: 0; transition: opacity .3s; z-index: 999; }
+    .toast.show { opacity: 1; }
+    .toast.success { background: var(--success); }
+    .toast.error { background: var(--danger); }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="navbar">
+  <h1>&#127919; Quiz Bot</h1>
+  <div class="status">
+    <span id="statusText">Idle</span>
+    <span class="status-dot" id="statusDot"></span>
+  </div>
+</nav>
+
+<!-- TABS -->
+<div class="tabs">
+  <button class="tab-btn active" data-tab="play">&#127918; Play Quiz</button>
+  <button class="tab-btn" data-tab="answers">&#128221; Manage Answers</button>
+</div>
+
+<div class="container">
+
+  <!-- ═══════ PLAY TAB ═══════ -->
+  <div id="tab-play" class="tab-content active">
+    <div class="card">
+      <h2>Game Settings</h2>
+      <div class="form-row">
+        <div>
+          <label for="gameId">Game ID</label>
+          <input type="text" id="gameId" placeholder="e.g. 762012">
+        </div>
+        <div>
+          <label for="nickname">Nickname</label>
+          <input type="text" id="nickname" placeholder="Leave blank for default">
+        </div>
+      </div>
+      <label>Mode</label>
+      <div class="radio-group">
+        <label><input type="radio" name="mode" value="auto" checked> Auto-answer</label>
+        <label><input type="radio" name="mode" value="readonly"> Read-only</label>
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-primary" id="btnStart" onclick="startBot()">&#9654; Start</button>
+        <button class="btn btn-danger" id="btnStop" onclick="stopBot()" disabled>&#9632; Stop</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Live Log</h2>
+      <div class="terminal" id="logArea"></div>
+    </div>
+  </div>
+
+  <!-- ═══════ ANSWERS TAB ═══════ -->
+  <div id="tab-answers" class="tab-content">
+
+    <div class="card">
+      <h2>Paste Raw Text</h2>
+      <p style="font-size:.84rem;color:var(--muted);margin-bottom:10px;">
+        Copy & paste the full answer page from the cheat website. Questions ending with <strong>?</strong> and the next line (the answer) will be extracted automatically.
+      </p>
+      <textarea id="rawText" placeholder="Paste raw text here..."></textarea>
+      <div style="margin-top:12px;" class="btn-group">
+        <button class="btn btn-primary" onclick="convertRaw()">&#128260; Convert &amp; Preview</button>
+        <button class="btn btn-success" id="btnSaveConverted" onclick="saveConverted()" style="display:none;">&#128190; Save to CSV</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Current Q&amp;A Pairs <span id="qaCount" style="font-weight:400;color:var(--muted);font-size:.85rem;"></span></h2>
+      <div style="overflow-x:auto;">
+        <table class="qa-table">
+          <thead><tr><th class="col-num">#</th><th>Question</th><th>Answer</th><th class="col-action"></th></tr></thead>
+          <tbody id="qaBody"></tbody>
+        </table>
+      </div>
+      <div style="margin-top:16px;">
+        <label>Add New Pair</label>
+        <div class="form-row" style="margin-top:6px;">
+          <div style="flex:3;"><input type="text" id="newQ" placeholder="Question"></div>
+          <div style="flex:2;"><input type="text" id="newA" placeholder="Answer"></div>
+          <div style="flex:0;display:flex;align-items:flex-end;"><button class="btn btn-success btn-sm" onclick="addPair()">+ Add</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ── State ──
+let answers = [];
+let convertedPairs = [];
+let logPoller = null;
+
+// ── Tabs ──
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+    if (btn.dataset.tab === 'answers') loadAnswers();
+  });
+});
+
+// ── Toast ──
+function toast(msg, type = 'success') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast show ' + type;
+  setTimeout(() => el.className = 'toast', 2500);
+}
+
+// ── Bot Control ──
+async function startBot() {
+  const gameId = document.getElementById('gameId').value.trim();
+  const nickname = document.getElementById('nickname').value.trim();
+  const mode = document.querySelector('input[name="mode"]:checked').value;
+
+  if (!gameId) { toast('Enter a Game ID', 'error'); return; }
+
+  const res = await fetch('/api/start', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ game_id: gameId, nickname: nickname || null, mode: mode === 'readonly' ? 'readonly' : 'auto' })
+  });
+  const data = await res.json();
+  if (res.ok) {
+    document.getElementById('btnStart').disabled = true;
+    document.getElementById('btnStop').disabled = false;
+    startLogPolling();
+    updateStatus(true);
+  } else {
+    toast(data.error || 'Failed to start', 'error');
+  }
+}
+
+async function stopBot() {
+  await fetch('/api/stop', { method: 'POST' });
+  document.getElementById('btnStart').disabled = false;
+  document.getElementById('btnStop').disabled = true;
+  updateStatus(false);
+}
+
+function updateStatus(running) {
+  document.getElementById('statusDot').className = 'status-dot' + (running ? ' running' : '');
+  document.getElementById('statusText').textContent = running ? 'Running' : 'Idle';
+}
+
+// ── Log Polling ──
+function startLogPolling() {
+  if (logPoller) return;
+  logPoller = setInterval(pollLogs, 500);
+}
+
+async function pollLogs() {
+  try {
+    const res = await fetch('/api/logs');
+    const data = await res.json();
+    const area = document.getElementById('logArea');
+    data.logs.forEach(msg => {
+      const div = document.createElement('div');
+      div.className = 'log-line';
+      div.textContent = msg;
+      area.appendChild(div);
+    });
+    if (data.logs.length) area.scrollTop = area.scrollHeight;
+
+    // Check if bot is still running
+    const st = await fetch('/api/status');
+    const sd = await st.json();
+    if (!sd.running) {
+      updateStatus(false);
+      document.getElementById('btnStart').disabled = false;
+      document.getElementById('btnStop').disabled = true;
+    }
+  } catch (e) { /* ignore */ }
+}
+
+// Auto-start polling on page load to catch any ongoing session
+startLogPolling();
+
+// ── Answers ──
+async function loadAnswers() {
+  const res = await fetch('/api/answers');
+  const data = await res.json();
+  answers = data.answers;
+  renderTable();
+}
+
+function renderTable() {
+  const body = document.getElementById('qaBody');
+  document.getElementById('qaCount').textContent = '(' + answers.length + ')';
+  if (!answers.length) {
+    body.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:24px;">No Q&A pairs yet. Paste raw text above or add manually.</td></tr>';
+    return;
+  }
+  body.innerHTML = answers.map((a, i) =>
+    `<tr>
+      <td class="col-num">${i + 1}</td>
+      <td>${esc(a.question)}</td>
+      <td>${esc(a.answer)}</td>
+      <td class="col-action"><button class="del-btn" onclick="deletePair(${i})" title="Delete">&#10005;</button></td>
+    </tr>`
+  ).join('');
+}
+
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+function deletePair(idx) {
+  answers.splice(idx, 1);
+  renderTable();
+  saveAnswersToServer();
+}
+
+function addPair() {
+  const q = document.getElementById('newQ').value.trim();
+  const a = document.getElementById('newA').value.trim();
+  if (!q || !a) { toast('Fill in both fields', 'error'); return; }
+  answers.push({ question: q, answer: a });
+  document.getElementById('newQ').value = '';
+  document.getElementById('newA').value = '';
+  renderTable();
+  saveAnswersToServer();
+}
+
+async function saveAnswersToServer() {
+  const res = await fetch('/api/answers', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ answers })
+  });
+  const data = await res.json();
+  toast(`Saved ${data.count} Q&A pairs`);
+}
+
+// ── Convert Raw ──
+async function convertRaw() {
+  const raw = document.getElementById('rawText').value;
+  if (!raw.trim()) { toast('Paste some text first', 'error'); return; }
+
+  const res = await fetch('/api/convert', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ raw_text: raw })
+  });
+  const data = await res.json();
+  convertedPairs = data.pairs;
+
+  if (!convertedPairs.length) {
+    toast('No Q&A pairs found in text', 'error');
+    return;
+  }
+
+  toast(`Found ${convertedPairs.length} Q&A pairs — click Save to apply`, 'success');
+  document.getElementById('btnSaveConverted').style.display = 'inline-block';
+
+  // Preview in the table
+  answers = convertedPairs.map(p => ({ question: p.question, answer: p.answer }));
+  renderTable();
+}
+
+function saveConverted() {
+  saveAnswersToServer();
+  document.getElementById('btnSaveConverted').style.display = 'none';
+  document.getElementById('rawText').value = '';
+  toast('Saved to CSV!');
+}
+
+// ── Init ──
+loadAnswers();
+// Check initial bot status
+fetch('/api/status').then(r => r.json()).then(d => {
+  updateStatus(d.running);
+  if (d.running) {
+    document.getElementById('btnStart').disabled = true;
+    document.getElementById('btnStop').disabled = false;
+  }
+});
+</script>
+</body>
+</html>
