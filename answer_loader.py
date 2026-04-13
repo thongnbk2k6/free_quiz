@@ -2,7 +2,7 @@ import pandas as pd
 
 
 def load_answers(path):
-    df = pd.read_csv(path)
+    df = pd.read_csv(path, encoding='utf-8-sig')
 
     answers = {}
 

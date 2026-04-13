@@ -9,12 +9,39 @@ from selenium.common.exceptions import (
 from difflib import SequenceMatcher
 import re
 import time
+import unicodedata
 
 import config
 
+# Map visually similar / semantically equivalent Unicode chars to ASCII
+_UNICODE_REPLACEMENTS = str.maketrans({
+    '\u2018': "'",  # left single quotation mark
+    '\u2019': "'",  # right single quotation mark
+    '\u201c': '"',  # left double quotation mark
+    '\u201d': '"',  # right double quotation mark
+    '\u2013': '-',  # en dash
+    '\u2014': '-',  # em dash
+    '\u2026': '...',# ellipsis
+    '\u00a0': ' ',  # non-breaking space
+    '\u200b': '',   # zero-width space
+    '\u200c': '',   # zero-width non-joiner
+    '\u200d': '',   # zero-width joiner
+    '\ufeff': '',   # BOM
+})
+
 
 def _normalize(text):
-    """Lowercase, collapse whitespace, strip non-alphanumeric (keep spaces)."""
+    """Lowercase, collapse whitespace, strip non-alphanumeric (keep spaces).
+
+    Also applies Unicode normalization (NFKC) and replaces look-alike
+    characters so that CSV entries and scraped text compare equal even
+    when the source encoding differs.
+    """
+    # 1) Replace known look-alike characters before decomposition
+    text = text.translate(_UNICODE_REPLACEMENTS)
+    # 2) NFKC: decompose then re-compose in canonical form (handles accented
+    #    chars, ligatures, fullwidth digits, etc.)
+    text = unicodedata.normalize('NFKC', text)
     text = text.lower().strip()
     text = re.sub(r'[^\w\s]', '', text)   # remove punctuation
     text = re.sub(r'\s+', ' ', text)       # collapse whitespace
@@ -57,7 +84,7 @@ def _find_answer(question_text, qa_database):
             best_score = score
             best_answer = csv_answer
 
-    if best_score >= 0.85:
+    if best_score >= 0.75:
         print(f"  (fuzzy match {best_score:.0%})")
         return best_answer
 
