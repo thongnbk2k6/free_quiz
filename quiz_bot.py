@@ -92,14 +92,14 @@ def _find_answer(question_text, qa_database):
 
 
 def _extract_question(raw_text):
-    """Pull the actual question (line ending with '?') from the element's full text.
+    """Pull the actual question (line ending with '?' or ':') from the element's full text.
 
     The question element often contains extra text like '1/10', option labels, etc.
-    We look for the first line ending with '?' which is the real question.
+    We look for the first line ending with '?' or ':' which is the real question.
     """
     for line in raw_text.splitlines():
         line = line.strip()
-        if line.endswith("?"):
+        if line.endswith("?") or line.endswith(":"):
             return line
     return raw_text.strip()
 

@@ -38,9 +38,9 @@ def start_bot():
     if bot_running:
         return jsonify({"error": "Bot is already running"}), 400
 
-    data = request.json
-    game_id = data.get("game_id", "").strip()
-    nickname = data.get("nickname", "").strip() or None
+    data = request.get_json(silent=True) or {}
+    game_id = (data.get("game_id") or "").strip()
+    nickname = (data.get("nickname") or "").strip() or None
     read_only = data.get("mode") == "readonly"
 
     if not game_id:
@@ -126,17 +126,26 @@ def get_answers():
 
 @app.route("/api/answers", methods=["POST"])
 def save_answers():
-    data = request.json
-    answers = data.get("answers", [])
-    pairs = [(a["question"], a["answer"]) for a in answers]
+    data = request.get_json(silent=True) or {}
+    answers = data.get("answers")
+    if not isinstance(answers, list):
+        answers = []
+    pairs = []
+    for a in answers:
+        if not isinstance(a, dict):
+            continue
+        q = str(a.get("question", "")).strip()
+        ans = str(a.get("answer", "")).strip()
+        if q and ans:
+            pairs.append((q, ans))
     write_csv(pairs, config.ANSWERS_CSV)
     return jsonify({"status": "saved", "count": len(pairs)})
 
 
 @app.route("/api/convert", methods=["POST"])
 def convert_raw():
-    data = request.json
-    raw_text = data.get("raw_text", "")
+    data = request.get_json(silent=True) or {}
+    raw_text = data.get("raw_text") or ""
     pairs = parse_raw_text(raw_text)
     return jsonify({"pairs": [{"question": q, "answer": a} for q, a in pairs]})
 

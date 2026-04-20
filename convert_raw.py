@@ -4,16 +4,22 @@ Outputs data/answer.csv in the correct format.
 """
 import csv
 import os
+import re
+
+# Matches answer prefix like "A. ", "B. ", "C. ", "D. "
+_ANSWER_PREFIX = re.compile(r'^[A-Da-d]\.\s+')
 
 
 def parse_raw_text(raw):
+    if raw is None:
+        raw = ""
     lines = raw.splitlines()
     pairs = []
     i = 0
     while i < len(lines):
         line = lines[i].strip()
-        # A question line ends with '?'
-        if line.endswith("?"):
+        # A question line ends with '?' or ':'
+        if line.endswith("?") or line.endswith(":"):
             question = line
             # Find the next non-empty line as the answer
             i += 1
@@ -21,6 +27,8 @@ def parse_raw_text(raw):
                 i += 1
             if i < len(lines):
                 answer = lines[i].strip()
+                # Strip letter prefix e.g. "C. " so it matches button text on quiz
+                answer = _ANSWER_PREFIX.sub('', answer)
                 pairs.append((question, answer))
         i += 1
     return pairs
